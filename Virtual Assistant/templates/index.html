@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virtual Assistant</title>
+</head>
+<body>
+    <h1>Welcome to Virtual Assistant</h1>
+    <button id="start-record-btn" onclick="startRecognition()">Start Voice Recognition</button>
+    <input type="text" id="query" placeholder="Ask me something..." style="display: none;">
+    <p id="response"></p>
+
+    <script>
+        window.onload = () => {
+            greetUser();
+        };
+
+        const greetUser = async () => {
+            const response = await fetch('/greet');
+            const data = await response.json();
+            document.getElementById('response').innerText = data.response;
+            speak(data.response);
+            setTimeout(askUsername, 3000); // wait for greeting to complete
+        };
+
+        const askUsername = async () => {
+            const response = await fetch('/username');
+            const data = await response.json();
+            document.getElementById('response').innerText = data.response;
+            speak(data.response);
+            startRecognition(); // Start recognition after asking for username
+        };
+
+        const startRecognition = () => {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                alert('Your browser does not support the Web Speech API');
+                return;
+            }
+
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'en-US';
+            recognition.interimResults = false;
+            recognition.continuous = true;
+
+            recognition.onstart = () => {
+                console.log('Voice recognition started. Try speaking into the microphone.');
+            };
+
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                document.getElementById('query').value = transcript;
+                sendQuery(transcript);
+            };
+
+            recognition.onerror = (event) => {
+                console.error('Voice recognition error:', event.error);
+                if (event.error === 'audio-capture') {
+                    alert('No microphone detected. Please check your microphone settings.');
+                } else if (event.error === 'not-allowed') {
+                    alert('Permission to use microphone denied. Please enable microphone permissions.');
+                } else {
+                    console.log('Voice recognition error: ' + event.error);
+                }
+            };
+
+            recognition.onend = () => {
+                console.log('Voice recognition ended. Restarting...');
+                startRecognition(); // Restart recognition
+            };
+
+            recognition.start();
+        };
+
+        const sendQuery = async (query) => {
+            const responseElement = document.getElementById('response');
+
+            const response = await fetch('/process', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `query=${query}`
+            });
+
+            const data = await response.json();
+            responseElement.innerText = data.response;
+            speak(data.response);
+        };
+
+        const speak = (text) => {
+            const msg = new SpeechSynthesisUtterance(text);
+            window.speechSynthesis.speak(msg);
+        };
+    </script>
+</body>
+</html>
